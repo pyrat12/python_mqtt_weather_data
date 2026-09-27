@@ -1,312 +1,944 @@
 <!DOCTYPE html>
+
 <html lang="en">
+
 <head>
+
     <meta charset="UTF-8">
+
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Lake Zurich Live Weather</title>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
+
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.3.2/socket.io.min.js"></script>
+
     <style>
+
         :root {
+
             --accent: #ffb057;
+
             --accent-warm: #ff8a5c;
+
             --glass: rgba(40, 24, 14, 0.32);
+
             --glass-border: rgba(255, 220, 180, 0.28);
+
             --text: #fff7ef;
+
             --text-dim: rgba(255, 247, 239, 0.78);
+
         }
+
 
         * { box-sizing: border-box; }
 
+
         html, body {
+
             margin: 0;
+
             min-height: 100vh;
+
             font-family: 'Inter', system-ui, sans-serif;
+
             color: var(--text);
+
         }
+
 
         body {
+
             position: relative;
+
             display: flex;
+
             flex-direction: column;
+
             align-items: center;
+
             padding: 40px 20px 60px;
+
             overflow-x: hidden;
+
             background:
+
                 linear-gradient(180deg, rgba(30, 16, 10, 0.55) 0%, rgba(40, 20, 10, 0.25) 40%, rgba(20, 10, 8, 0.75) 100%),
+
                 url('https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Wurmsbach_Sunset.jpg/1280px-Wurmsbach_Sunset.jpg') center center / cover no-repeat fixed;
+
         }
+
 
         /* Warm glow near the sun on the horizon */
+
         body::before {
+
             content: "";
+
             position: fixed;
+
             top: 0; left: 0; right: 0; bottom: 0;
+
             background:
+
                 radial-gradient(circle at 62% 38%, rgba(255, 200, 130, 0.35) 0%, rgba(255, 176, 87, 0.12) 18%, rgba(255, 176, 87, 0) 32%);
+
             pointer-events: none;
+
             z-index: 0;
+
         }
+
 
         main {
+
             position: relative;
+
             z-index: 2;
+
             width: 100%;
+
             max-width: 780px;
+
             display: flex;
+
             flex-direction: column;
+
             gap: 22px;
+
         }
+
 
         header { text-align: center; }
+
         header h1 {
+
             font-family: 'Poppins', sans-serif;
+
             font-weight: 700;
+
             font-size: clamp(1.6rem, 4vw, 2.4rem);
+
             margin: 0 0 6px;
+
             letter-spacing: 0.02em;
+
         }
+
         header p {
+
             margin: 0;
+
             color: var(--text-dim);
+
             font-size: 0.95rem;
+
         }
+
 
         .glass {
+
             background: var(--glass);
+
             border: 1px solid var(--glass-border);
+
             border-radius: 20px;
+
             backdrop-filter: blur(14px);
+
             -webkit-backdrop-filter: blur(14px);
+
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+
         }
+
 
         .status-row {
+
             display: flex;
+
             align-items: center;
+
             justify-content: space-between;
+
             padding: 18px 24px;
+
             flex-wrap: wrap;
+
             gap: 16px;
+
         }
+
 
         .reading {
+
             display: flex;
+
             align-items: baseline;
+
             gap: 6px;
+
         }
+
         .reading .value {
+
             font-family: 'Poppins', sans-serif;
+
             font-weight: 600;
+
             font-size: clamp(2.4rem, 7vw, 3.4rem);
+
             line-height: 1;
+
         }
+
         .reading .unit {
+
             font-size: 1.3rem;
+
             color: var(--text-dim);
+
         }
+
         .reading .label {
+
             display: block;
+
             font-size: 0.8rem;
+
             text-transform: uppercase;
+
             letter-spacing: 0.08em;
+
             color: var(--text-dim);
+
             margin-bottom: 4px;
+
         }
+
 
         .status-pill {
+
             display: flex;
+
             align-items: center;
+
             gap: 8px;
+
             padding: 8px 14px;
+
             border-radius: 999px;
+
             background: rgba(0, 0, 0, 0.18);
+
             font-size: 0.85rem;
+
             color: var(--text-dim);
+
         }
+
         .dot {
+
             width: 9px; height: 9px;
+
             border-radius: 50%;
+
             background: #ff5f5f;
+
             box-shadow: 0 0 8px #ff5f5f;
+
             transition: background 0.3s, box-shadow 0.3s;
+
         }
+
         .dot.live {
+
             background: #58e07a;
+
             box-shadow: 0 0 8px #58e07a;
+
             animation: pulse 1.8s ease-in-out infinite;
+
         }
+
         @keyframes pulse {
+
             0%, 100% { opacity: 1; }
+
             50% { opacity: 0.45; }
+
         }
+
 
         .chart-card { padding: 20px 22px 8px; }
+
         .chart-card h2 {
+
             font-family: 'Poppins', sans-serif;
+
             font-size: 1rem;
+
             font-weight: 600;
+
             margin: 0 0 12px;
+
             color: var(--text-dim);
+
         }
+
         .chart-wrap { position: relative; height: 320px; }
 
+
         footer {
+
             text-align: center;
+
             font-size: 0.8rem;
+
             color: var(--text-dim);
+
             margin-top: 4px;
+
         }
+
         footer a { color: inherit; }
+
         .credit {
+
             font-size: 0.7rem;
+
             opacity: 0.6;
+
             margin-top: 2px;
+
         }
+
 
         @media (max-width: 520px) {
+
             .chart-wrap { height: 260px; }
+
             .status-row { flex-direction: column; align-items: flex-start; }
+
         }
+
     </style>
+
 </head>
+
 <body>
+
     <main>
+
         <header>
+
             <h1>Lake Zurich Live Weather</h1>
-            <p>Real-time air temperature &middot; Tiefenbrunnen measuring station</p>
+
+            <!-- NEU: Untertitel um Wassertemperatur und Windgeschwindigkeit erweitert -->
+            <p>Real-time air temperature, water temperature &amp; wind speed &middot; Tiefenbrunnen measuring station</p>
+
         </header>
 
+
         <section class="glass status-row">
+
             <div class="reading">
+
                 <div>
-                    <span class="label">Current temperature</span>
+
+                    <!-- NEU: Current temperature zu Air temperature präzisiert -->
+                    <span class="label">Air temperature</span>
+
                     <span class="value" id="currentValue">&mdash;</span><span class="unit">&deg;C</span>
+
                 </div>
+
             </div>
+
+
+            <!-- NEU: Anzeige für aktuelle Wassertemperatur -->
+            <div class="reading">
+
+                <div>
+
+                    <span class="label">Water temperature</span>
+
+                    <span class="value" id="currentWaterValue">&mdash;</span><span class="unit">&deg;C</span>
+
+                </div>
+
+            </div>
+
+
+            <!-- NEU: Anzeige für aktuelle Windgeschwindigkeit -->
+            <div class="reading">
+
+                <div>
+
+                    <span class="label">Wind speed</span>
+
+                    <span class="value" id="currentWindValue">&mdash;</span><span class="unit">m/s</span>
+
+                </div>
+
+            </div>
+
+
             <div class="status-pill">
+
                 <span class="dot" id="statusDot"></span>
+
                 <span id="statusText">Connecting&hellip;</span>
+
             </div>
+
         </section>
+
 
         <section class="glass chart-card">
-            <h2>Temperature over time</h2>
+
+            <!-- NEU: Titel präzisiert -->
+            <h2>Air temperature over time</h2>
+
             <div class="chart-wrap">
+
                 <canvas id="temperatureChart"></canvas>
+
             </div>
+
         </section>
 
+
+        <!-- NEU: Zusätzliches Diagramm für Wassertemperatur -->
+        <section class="glass chart-card">
+
+            <h2>Water temperature over time</h2>
+
+            <div class="chart-wrap">
+
+                <canvas id="waterTemperatureChart"></canvas>
+
+            </div>
+
+        </section>
+
+
+        <!-- NEU: Zusätzliches Diagramm für Windgeschwindigkeit -->
+        <section class="glass chart-card">
+
+            <h2>Wind speed over time</h2>
+
+            <div class="chart-wrap">
+
+                <canvas id="windSpeedChart"></canvas>
+
+            </div>
+
+        </section>
+
+
         <footer>
+
             Data streamed live via MQTT &amp; Socket.IO
+
             <div class="credit">Photo: Lake Zurich sunset by Adrian Michael (CC BY-SA), via Wikimedia Commons</div>
+
         </footer>
+
     </main>
 
+
     <script>
+
         const MAX_POINTS = 30;
+
         const temperatureCtx = document.getElementById('temperatureChart').getContext('2d');
+
         const currentValueEl = document.getElementById('currentValue');
+
+
+        // NEU: HTML-Elemente für Wassertemperatur
+        const waterTemperatureCtx = document.getElementById('waterTemperatureChart').getContext('2d');
+
+        const currentWaterValueEl = document.getElementById('currentWaterValue');
+
+
+        // NEU: HTML-Elemente für Windgeschwindigkeit
+        const windSpeedCtx = document.getElementById('windSpeedChart').getContext('2d');
+
+        const currentWindValueEl = document.getElementById('currentWindValue');
+
+
         const statusDot = document.getElementById('statusDot');
+
         const statusText = document.getElementById('statusText');
+
 
         const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
 
+
         const gradient = temperatureCtx.createLinearGradient(0, 0, 0, 320);
+
         gradient.addColorStop(0, 'rgba(255, 176, 87, 0.35)');
+
         gradient.addColorStop(1, 'rgba(255, 176, 87, 0)');
 
+
+        // NEU: Farbverlauf für Wassertemperatur
+        const waterGradient = waterTemperatureCtx.createLinearGradient(0, 0, 0, 320);
+
+        waterGradient.addColorStop(0, 'rgba(80, 180, 255, 0.35)');
+
+        waterGradient.addColorStop(1, 'rgba(80, 180, 255, 0)');
+
+
+        // NEU: Farbverlauf für Windgeschwindigkeit
+        const windGradient = windSpeedCtx.createLinearGradient(0, 0, 0, 320);
+
+        windGradient.addColorStop(0, 'rgba(100, 255, 170, 0.35)');
+
+        windGradient.addColorStop(1, 'rgba(100, 255, 170, 0)');
+
+
         const temperatureChart = new Chart(temperatureCtx, {
+
             type: 'line',
+
             data: {
+
                 labels: [],
+
                 datasets: [{
-                    label: 'Temperature (°C)',
+
+                    label: 'Air Temperature (°C)',
+
                     data: [],
+
                     fill: true,
+
                     backgroundColor: gradient,
+
                     borderColor: accent,
+
                     borderWidth: 2.5,
+
                     pointRadius: 0,
+
                     pointHoverRadius: 5,
+
                     pointHoverBackgroundColor: accent,
+
                     cubicInterpolationMode: 'monotone',
+
                     tension: 0.35
+
                 }]
+
             },
+
             options: {
+
                 responsive: true,
+
                 maintainAspectRatio: false,
+
                 animation: false,
+
                 interaction: { intersect: false, mode: 'index' },
+
                 plugins: {
+
                     legend: { display: false },
+
                     tooltip: {
+
                         backgroundColor: 'rgba(15, 25, 45, 0.9)',
+
                         titleColor: '#f4f8fb',
+
                         bodyColor: '#f4f8fb',
+
                         borderColor: 'rgba(255,255,255,0.15)',
+
                         borderWidth: 1,
+
                         padding: 10,
+
                         displayColors: false
+
                     }
+
                 },
+
                 scales: {
+
                     x: {
+
                         display: true,
+
                         ticks: { color: 'rgba(244,248,251,0.6)', maxRotation: 0, autoSkip: true, maxTicksLimit: 6 },
+
                         grid: { color: 'rgba(255,255,255,0.06)' }
+
                     },
+
                     y: {
+
                         display: true,
+
                         title: {
+
                             display: true,
+
                             text: 'Temperature (°C)',
+
                             color: 'rgba(244,248,251,0.6)'
+
                         },
+
                         ticks: { color: 'rgba(244,248,251,0.6)' },
+
                         grid: { color: 'rgba(255,255,255,0.06)' },
+
                         min: 0,
+
                         max: 50
+
                     }
+
                 }
+
             }
+
         });
+
+
+        // NEU: Diagramm für Wassertemperatur
+        const waterTemperatureChart = new Chart(waterTemperatureCtx, {
+
+            type: 'line',
+
+            data: {
+
+                labels: [],
+
+                datasets: [{
+
+                    label: 'Water Temperature (°C)',
+
+                    data: [],
+
+                    fill: true,
+
+                    backgroundColor: waterGradient,
+
+                    borderColor: '#50b4ff',
+
+                    borderWidth: 2.5,
+
+                    pointRadius: 0,
+
+                    pointHoverRadius: 5,
+
+                    pointHoverBackgroundColor: '#50b4ff',
+
+                    cubicInterpolationMode: 'monotone',
+
+                    tension: 0.35
+
+                }]
+
+            },
+
+            options: {
+
+                responsive: true,
+
+                maintainAspectRatio: false,
+
+                animation: false,
+
+                interaction: { intersect: false, mode: 'index' },
+
+                plugins: {
+
+                    legend: { display: false },
+
+                    tooltip: {
+
+                        backgroundColor: 'rgba(15, 25, 45, 0.9)',
+
+                        titleColor: '#f4f8fb',
+
+                        bodyColor: '#f4f8fb',
+
+                        borderColor: 'rgba(255,255,255,0.15)',
+
+                        borderWidth: 1,
+
+                        padding: 10,
+
+                        displayColors: false
+
+                    }
+
+                },
+
+                scales: {
+
+                    x: {
+
+                        display: true,
+
+                        ticks: { color: 'rgba(244,248,251,0.6)', maxRotation: 0, autoSkip: true, maxTicksLimit: 6 },
+
+                        grid: { color: 'rgba(255,255,255,0.06)' }
+
+                    },
+
+                    y: {
+
+                        display: true,
+
+                        title: {
+
+                            display: true,
+
+                            text: 'Water temperature (°C)',
+
+                            color: 'rgba(244,248,251,0.6)'
+
+                        },
+
+                        ticks: { color: 'rgba(244,248,251,0.6)' },
+
+                        grid: { color: 'rgba(255,255,255,0.06)' }
+
+                    }
+
+                }
+
+            }
+
+        });
+
+
+        // NEU: Diagramm für Windgeschwindigkeit
+        const windSpeedChart = new Chart(windSpeedCtx, {
+
+            type: 'line',
+
+            data: {
+
+                labels: [],
+
+                datasets: [{
+
+                    label: 'Wind Speed (m/s)',
+
+                    data: [],
+
+                    fill: true,
+
+                    backgroundColor: windGradient,
+
+                    borderColor: '#64ffaa',
+
+                    borderWidth: 2.5,
+
+                    pointRadius: 0,
+
+                    pointHoverRadius: 5,
+
+                    pointHoverBackgroundColor: '#64ffaa',
+
+                    cubicInterpolationMode: 'monotone',
+
+                    tension: 0.35
+
+                }]
+
+            },
+
+            options: {
+
+                responsive: true,
+
+                maintainAspectRatio: false,
+
+                animation: false,
+
+                interaction: { intersect: false, mode: 'index' },
+
+                plugins: {
+
+                    legend: { display: false },
+
+                    tooltip: {
+
+                        backgroundColor: 'rgba(15, 25, 45, 0.9)',
+
+                        titleColor: '#f4f8fb',
+
+                        bodyColor: '#f4f8fb',
+
+                        borderColor: 'rgba(255,255,255,0.15)',
+
+                        borderWidth: 1,
+
+                        padding: 10,
+
+                        displayColors: false
+
+                    }
+
+                },
+
+                scales: {
+
+                    x: {
+
+                        display: true,
+
+                        ticks: { color: 'rgba(244,248,251,0.6)', maxRotation: 0, autoSkip: true, maxTicksLimit: 6 },
+
+                        grid: { color: 'rgba(255,255,255,0.06)' }
+
+                    },
+
+                    y: {
+
+                        display: true,
+
+                        title: {
+
+                            display: true,
+
+                            text: 'Wind speed (m/s)',
+
+                            color: 'rgba(244,248,251,0.6)'
+
+                        },
+
+                        ticks: { color: 'rgba(244,248,251,0.6)' },
+
+                        grid: { color: 'rgba(255,255,255,0.06)' }
+
+                    }
+
+                }
+
+            }
+
+        });
+
 
         const socket = io();
 
+
         socket.on('connect', () => {
+
             statusDot.classList.add('live');
+
             statusText.textContent = 'Live';
+
         });
+
 
         socket.on('disconnect', () => {
+
             statusDot.classList.remove('live');
+
             statusText.textContent = 'Disconnected';
+
         });
+
 
         socket.on('mqtt_message', function(msg) {
-            if (msg.topic !== 'sensor/temp') {
-                return;
-            }
+
             const value = parseFloat(msg.data);
+
             const currentTime = new Date().toLocaleTimeString();
 
-            currentValueEl.textContent = value.toFixed(1);
 
-            temperatureChart.data.labels.push(currentTime);
-            temperatureChart.data.datasets[0].data.push(value);
+            // NEU: Lufttemperatur anhand des MQTT-Topics verarbeiten
+            if (msg.topic === 'sensor/temp') {
 
-            if (temperatureChart.data.labels.length > MAX_POINTS) {
-                temperatureChart.data.labels.shift();
-                temperatureChart.data.datasets[0].data.shift();
+                currentValueEl.textContent = value.toFixed(1);
+
+                temperatureChart.data.labels.push(currentTime);
+
+                temperatureChart.data.datasets[0].data.push(value);
+
+                if (temperatureChart.data.labels.length > MAX_POINTS) {
+
+                    temperatureChart.data.labels.shift();
+
+                    temperatureChart.data.datasets[0].data.shift();
+
+                }
+
+                temperatureChart.update();
+
             }
 
-            temperatureChart.update();
+
+            // NEU: Wassertemperatur anhand des MQTT-Topics verarbeiten
+            else if (msg.topic === 'sensor/water_temp') {
+
+                currentWaterValueEl.textContent = value.toFixed(1);
+
+                waterTemperatureChart.data.labels.push(currentTime);
+
+                waterTemperatureChart.data.datasets[0].data.push(value);
+
+                if (waterTemperatureChart.data.labels.length > MAX_POINTS) {
+
+                    waterTemperatureChart.data.labels.shift();
+
+                    waterTemperatureChart.data.datasets[0].data.shift();
+
+                }
+
+                waterTemperatureChart.update();
+
+            }
+
+
+            // NEU: Windgeschwindigkeit anhand des MQTT-Topics verarbeiten
+            else if (msg.topic === 'sensor/wind_speed') {
+
+                currentWindValueEl.textContent = value.toFixed(1);
+
+                windSpeedChart.data.labels.push(currentTime);
+
+                windSpeedChart.data.datasets[0].data.push(value);
+
+                if (windSpeedChart.data.labels.length > MAX_POINTS) {
+
+                    windSpeedChart.data.labels.shift();
+
+                    windSpeedChart.data.datasets[0].data.shift();
+
+                }
+
+                windSpeedChart.update();
+
+            }
+
         });
+
     </script>
+
 </body>
+
 </html>
